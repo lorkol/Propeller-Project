@@ -368,6 +368,7 @@ void close_serial() {
 void servo_command(int pin, int angle){
   for (int i = 0; i < SERVO_ITERATIONS ; i++){
     pulse_out(pin, (500+10*angle));
+    pause(20);
     }
 }
 
