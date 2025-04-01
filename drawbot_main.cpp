@@ -40,6 +40,7 @@ void update_joint_angles(float jx, float jy);
 void init_serial(void);
 void close_serial(void);
 void servo_command(int pin, int angle);
+void servo_arms_commands(int shoulder_angle, int elbow_angle);
 
 int main() // Main function
 {
@@ -400,4 +401,10 @@ void servo_command(int pin, int angle){
   for (int i = 0; i < SERVO_ITERATIONS ; i++){
     pulse_out(pin, (500+10*angle));
     }
+}
+
+void servo_arms_commands(int shoulder_angle, int elbow_angle)
+{
+    servo_command(SHOULDER_PIN, shoulder_angle);
+    servo_command(ELBOW_PIN, elbow_angle);
 }
