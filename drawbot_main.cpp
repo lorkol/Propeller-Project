@@ -32,7 +32,6 @@ static volatile int wrist_angle = 40;
 void send_string(char str_msg[MAX_CMD_LENGTH]);
 void itos(int num, char *str);
 void concat(char *dest, char *src);
-void input_string();
 bool IK(float x, float y, float* theta1, float* theta2);
 void parseCoordinates(char* input, char coordinates[MAX_COMMANDS][MAX_CMD_LENGTH], int* count);
 void drawJoystickMap(float jx, float jy);
@@ -260,37 +259,6 @@ void concat(char *dest, char *src) {
 
     dest[i] = '\0'; // Null terminate the string
 }
-
-void input_string() {
-    int shoulder_angle, elbow_angle, wrist_angle;
-    
-    print("Enter joint angles: ");
-    scanf("%d %d %d\n", &shoulder_angle, &elbow_angle, &wrist_angle);
-
-    char strA[3];
-    char strB[3];
-    char strC[3];
-
-    itos(shoulder_angle, strA);
-    itos(elbow_angle, strB);
-    itos(wrist_angle, strC);
-
-    char result[12];
-    result[0] = '\0'; // Initialize result as an empty string
-
-    concat(result, strA);
-    concat(result, " ");
-    concat(result, strB);
-    concat(result, " ");
-    concat(result, strC);
-    concat(result, "\n");
-    
-    send_string(result);
-    printf("%s", result);
-    return;
-}
-
-
 
 void drawJoystickMap(float vx, float vy) {
     char grid[5][5] = {
