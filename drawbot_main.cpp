@@ -58,7 +58,7 @@ int main() // Main function
     if (!strcmp(selection,"J"))
     {
         adc_init(21, 20, 19, 18);  // CS=21, SCL=20, DO=19, DI=18
-    
+
         float lrV, udV;  // Voltage variables
         
         
@@ -88,7 +88,7 @@ int main() // Main function
         printf("num commands = %d\n", count);
         for(int i = 0; i < count; i++)
         {
-        printf("command sent : %s\n", commands[i]);
+        printf("command sent : %d, %d, %d\n", commands[i][0], commands[i][1], commands[i][2]);
         all_servos(commands[i]);
         if (get_state(RESET_BTN)) break;
         pause(100);
