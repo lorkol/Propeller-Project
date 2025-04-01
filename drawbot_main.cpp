@@ -20,6 +20,12 @@ static volatile int elbow_angle = 90;
 static volatile int shoulder_angle = 90;
 static volatile int wrist_angle = 40;
 
+//Servo Pins
+#define SHOULDER_PIN 15
+#define ELBOW_PIN 16
+#define WRIST_PIN 17
+#define SERVO_ITERATIONS 20 //iterations needed for the servos to be able to reach any angle
+
 // Function prototypes
 void send_string(char str_msg[MAX_CMD_LENGTH]);
 void itos(int num, char *str);
@@ -31,6 +37,7 @@ void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
 void init_serial(void);
 void close_serial(void);
+void servo_command(int pin, int angle);
 
 int main() // Main function
 {
@@ -383,5 +390,12 @@ void close_serial() {
     if (nano_serial != NULL) {
         fdserial_close(nano_serial);
         nano_serial = NULL;
+    }
+}
+
+
+void servo_command(int pin, int angle){
+  for (int i = 0; i < SERVO_ITERATIONS ; i++){
+    pulse_out(pin, (500+10*angle));
     }
 }
