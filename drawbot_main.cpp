@@ -108,36 +108,34 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
     bool success;
 
     while(token != NULL && *count < MAX_COMMANDS) {
-      printf("token = %s\n",token);
-      if(token[0] == 'u') {
-        coordinates[*count][0] = -1;
-        coordinates[*count][1] = -1;
         coordinates[*count][2] = WRIST_UP;
       }        
       else if(token[0] == 'd') {
-        coordinates[*count][0] = -1;
-        coordinates[*count][1] = -1;
-        coordinates[*count][2] = WRIST_DOWN;
-      }
-      else 
-      {
-        // Split the token at the comma to get x and y coordinates
-        char *comma_pos = strchr(token, ',');
-        if(comma_pos != NULL) {
-          // Temporarily replace comma with null terminator
-          *comma_pos = '\0';
-          x = atof(token);
-          y = atof(comma_pos + 1);
-          // Restore the comma
-          *comma_pos = ',';
-        } 
-        else {// Invalid format - do nothing
-        coordinates[*count][0] = -1;
-        coordinates[*count][1] = -1;
-        coordinates[*count][2] = -1;
-      } 
-          continue;
+        printf("token = %s\n",token);
+        if(token[0] == 'u') {
+            coordinates[*count][0] = -1;
+            coordinates[*count][1] = -1;
+            coordinates[*count][2] = WRIST_UP;
+        }        
+        else if(token[0] == 'd') {
+            coordinates[*count][1] = -1;
+            coordinates[*count][2] = WRIST_DOWN;
         }
+        else 
+        {
+            // Split the token at the comma to get x and y coordinates
+            char *comma_pos = strchr(token, ',');
+            if(comma_pos != NULL) {
+                // Temporarily replace comma with null terminator
+                *comma_pos = '\0';
+                x = atof(token);
+                y = atof(comma_pos + 1);
+                // Restore the comma
+                *comma_pos = ',';
+            } 
+            else {// Invalid format - do nothing
+                coordinates[*count][0] = -1;
+                coordinates[*count][1] = -1;
         success = IK(x, y, &theta1, &theta2);
 
         //Round up theta1 and theta2 and convert to integers
@@ -149,24 +147,25 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
         if(success)
         {
           // Convert to integers
-        int theta1_int = (int)theta1;
-        int theta2_int = (int)theta2;  
-        coordinates[*count][0] = theta1_int;
-        coordinates[*count][1] = theta2_int;
-        coordinates[*count][2] = -1;
-        print("angles = %d,%d\n", theta1_int,theta2_int);
+            int theta1_int = (int)theta1;
+            int theta2_int = (int)theta2;  
+            coordinates[*count][0] = theta1_int;
+            coordinates[*count][1] = theta2_int;
+            coordinates[*count][2] = -1;
+            print("angles = %d,%d\n", theta1_int,theta2_int);
         }
         else// IK failed
         {
-          coordinates[*count][0] = -1;
-          coordinates[*count][1] = -1;
-          coordinates[*count][2] = -1;
+            coordinates[*count][0] = -1;
+            coordinates[*count][1] = -1;
+            coordinates[*count][2] = -1;
         }
       }
 
       (*count)++;
       token = strtok(NULL, " ");  // Get the next token
     }
+}
 
 
 
@@ -206,7 +205,6 @@ bool IK(float x, float y, float* theta1, float* theta2) {
         {
           *theta1 = asin(y/(2*LINK1_LENGTH));
           *theta2 = M_PI - 2*(*theta1);
-          
         }
         
         *theta1 = *theta1 * 180.0/M_PI;
