@@ -28,6 +28,10 @@ static volatile int wrist_angle = 40;
 #define WRIST_UP 40
 #define WRIST_DOWN 90
 #define CONSTRAIN(x, lower, upper) ((x < lower) ? lower : ((x > upper) ? upper : x))
+#define UPPER_SHOULDER_CONSTRAIN 180
+#define LOWER_SHOULDER_CONSTRAIN 0
+#define UPPER_ELBOW_CONSTRAIN 180
+#define LOWER_ELBOW_CONSTRAIN 0
 
 // Function prototypes
 void send_string(char str_msg[MAX_CMD_LENGTH]);
@@ -385,8 +389,8 @@ void servo_command(int pin, int angle){
 
 void servo_arms_commands(int shoulder_angle, int elbow_angle)
 {
-    if(shoulder_angle!= -1) servo_command(SHOULDER_PIN, CONSTRAIN(shoulder_angle, 0, 180));
-    if(elbow_angle!= -1) servo_command(ELBOW_PIN, 180 - CONSTRAIN(elbow_angle, 0, 180));
+    if(shoulder_angle!= -1) servo_command(SHOULDER_PIN, CONSTRAIN(shoulder_angle, LOWER_SHOULDER_CONSTRAIN, UPPER_SHOULDER_CONSTRAIN));
+    if(elbow_angle!= -1) servo_command(ELBOW_PIN, 180 - CONSTRAIN(elbow_angle, LOWER_ELBOW_CONSTRAIN, UPPER_ELBOW_CONSTRAIN));
 }
 
 void all_servos(int commands[3])
