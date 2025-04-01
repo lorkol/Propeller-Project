@@ -33,13 +33,14 @@ void send_string(char str_msg[MAX_CMD_LENGTH]);
 void itos(int num, char *str);
 void concat(char *dest, char *src);
 bool IK(float x, float y, float* theta1, float* theta2);
-void parseCoordinates(char* input, char coordinates[MAX_COMMANDS][MAX_CMD_LENGTH], int* count);
+void parseCoordinates(char* input, int coordinates[MAX_COMMANDS][3], int* count);
 void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
 void init_serial(void);
 void close_serial(void);
 void servo_command(int pin, int angle);
 void servo_arms_commands(int shoulder_angle, int elbow_angle);
+void all_servos(int commands[3]);
 
 int main() // Main function
 {
@@ -50,9 +51,9 @@ int main() // Main function
   char updated_angles_str[MAX_CMD_LENGTH];
   sprintf(updated_angles_str, "%d,%d", shoulder_angle, elbow_angle);
   while(!get_state(NANO_READY)){}
-  send_string(updated_angles_str); 
+  servo_arms_commands(shoulder_angle, elbow_angle);
   while(!get_state(NANO_READY)){}
-  send_string("u");
+  servo_command(WRIST_PIN, WRIST_UP);
 
   char* selection;
   while(1)
@@ -86,7 +87,7 @@ int main() // Main function
         char input_str[MAX_CMD_LENGTH] = "60,60 60,61 60,62 60,63 60,64 60,68 60,69 60,70 60,72 60,75 60,78 60,80";
         //char input_str[] = "u d u d u d";
         //char input_str[] = "u";
-        char commands[MAX_COMMANDS][MAX_CMD_LENGTH];
+        int commands[MAX_COMMANDS][3];
         int count = 0;
         parseCoordinates(input_str, commands, &count);
         printf("num commands = %d\n", count);
@@ -94,7 +95,7 @@ int main() // Main function
         {
         printf("command sent : %s\n", commands[i]);
         while(!get_state(NANO_READY)){}
-        if(strcmp(commands[i], "")) send_string(commands[i]); //Send the command if it's not empty
+        all_servos(commands[i]);
         if (get_state(RESET_BTN)) break;
         pause(100);
         }
@@ -105,7 +106,7 @@ int main() // Main function
   close_serial();
 }
 
-void parseCoordinates(char input[MAX_CMD_LENGTH], char coordinates[MAX_COMMANDS][MAX_CMD_LENGTH], int* count) {
+void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][3], int* count) {
     *count = 0;
     char *token = strtok(input, " ");
     float x, y;
@@ -115,8 +116,16 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], char coordinates[MAX_COMMANDS]
 
     while(token != NULL && *count < MAX_COMMANDS) {
       printf("token = %s\n",token);
-      if(token[0] == 'u') strcpy(coordinates[*count],"u");
-      else if(token[0] == 'd') strcpy(coordinates[*count],"d");
+      if(token[0] == 'u') {
+        coordinates[*count][0] = -1;
+        coordinates[*count][1] = -1;
+        coordinates[*count][2] = WRIST_UP;
+      }        
+      else if(token[0] == 'd') {
+        coordinates[*count][0] = -1;
+        coordinates[*count][1] = -1;
+        coordinates[*count][2] = WRIST_DOWN;
+      }
       else 
       {
         // Split the token at the comma to get x and y coordinates
@@ -128,8 +137,12 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], char coordinates[MAX_COMMANDS]
           y = atof(comma_pos + 1);
           // Restore the comma
           *comma_pos = ',';
-        } else {
-          strcpy(coordinates[*count], ""); // Invalid format
+        } 
+        else {// Invalid format - do nothing
+        coordinates[*count][0] = -1;
+        coordinates[*count][1] = -1;
+        coordinates[*count][2] = -1;
+      } 
           continue;
         }
         success = IK(x, y, &theta1, &theta2);
@@ -145,16 +158,24 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], char coordinates[MAX_COMMANDS]
           // Convert to integers
         int theta1_int = (int)theta1;
         int theta2_int = (int)theta2;  
-          sprintf(coordinates[*count], "%d,%d", theta1_int, theta2_int);
-          print("angles = %d,%d\n", theta1_int,theta2_int);
+        coordinates[*count][0] = theta1_int;
+        coordinates[*count][1] = theta2_int;
+        coordinates[*count][2] = -1;
+        print("angles = %d,%d\n", theta1_int,theta2_int);
         }
-        else strcpy(coordinates[*count], ""); // IK failed
+        else// IK failed
+        {
+          coordinates[*count][0] = -1;
+          coordinates[*count][1] = -1;
+          coordinates[*count][2] = -1;
+        }
       }
 
       (*count)++;
       token = strtok(NULL, " ");  // Get the next token
     }
-}
+
+
 
 bool IK(float x, float y, float* theta1, float* theta2) {
     float c2 = (x*x + y*y - LINK1_LENGTH*LINK1_LENGTH - LINK2_LENGTH*LINK2_LENGTH)/(2*LINK1_LENGTH*LINK2_LENGTH);
@@ -333,18 +354,15 @@ void update_joint_angles(float vx, float vy) {
     if (new_shoulder_angle == shoulder_angle && new_elbow_angle == elbow_angle) return;
     else if (new_shoulder_angle == shoulder_angle && new_elbow_angle != elbow_angle)
     {
-        sprintf(updated_angles_str, "%d,%d", -1, new_elbow_angle);
-        send_string(updated_angles_str);
+        servo_arms_commands(-1, new_elbow_angle);
     }
     else if (new_shoulder_angle != shoulder_angle && new_elbow_angle == elbow_angle)
     {
-        sprintf(updated_angles_str, "%d,%d", new_shoulder_angle, -1);
-        send_string(updated_angles_str);
+        servo_arms_commands(new_shoulder_angle, -1);
     }
     else
     {
-      sprintf(updated_angles_str, "%d,%d", new_shoulder_angle, new_elbow_angle);
-      send_string(updated_angles_str);
+      servo_arms_commands(new_shoulder_angle, new_elbow_angle);
     }
 
     shoulder_angle = new_shoulder_angle;
