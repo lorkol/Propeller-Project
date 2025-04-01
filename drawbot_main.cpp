@@ -25,6 +25,8 @@ static volatile int wrist_angle = 40;
 #define ELBOW_PIN 16
 #define WRIST_PIN 17
 #define SERVO_ITERATIONS 20 //iterations needed for the servos to be able to reach any angle
+#define WRIST_UP 40
+#define WRIST_DOWN 90
 
 // Function prototypes
 void send_string(char str_msg[MAX_CMD_LENGTH]);
