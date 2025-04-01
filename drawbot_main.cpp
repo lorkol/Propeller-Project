@@ -392,6 +392,13 @@ void servo_command(int pin, int angle){
 
 void servo_arms_commands(int shoulder_angle, int elbow_angle)
 {
-    servo_command(SHOULDER_PIN, shoulder_angle);
-    servo_command(ELBOW_PIN, elbow_angle);
+    if(shoulder_angle!= -1) servo_command(SHOULDER_PIN, shoulder_angle);
+    if(elbow_angle!= -1) servo_command(ELBOW_PIN, elbow_angle);
+}
+
+void all_servos(int commands[3])
+{
+    if(commands[0] == -1 && commands[1] == -1 && commands[2] == -1) return;
+    servo_arms_commands(commands[0], commands[1]);
+    servo_command(WRIST_PIN, commands[2]);
 }
