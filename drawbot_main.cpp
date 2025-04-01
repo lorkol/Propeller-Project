@@ -108,9 +108,6 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
     bool success;
 
     while(token != NULL && *count < MAX_COMMANDS) {
-        coordinates[*count][2] = WRIST_UP;
-      }        
-      else if(token[0] == 'd') {
         printf("token = %s\n",token);
         if(token[0] == 'u') {
             coordinates[*count][0] = -1;
@@ -118,6 +115,7 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
             coordinates[*count][2] = WRIST_UP;
         }        
         else if(token[0] == 'd') {
+            coordinates[*count][0] = -1;
             coordinates[*count][1] = -1;
             coordinates[*count][2] = WRIST_DOWN;
         }
@@ -136,6 +134,9 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
             else {// Invalid format - do nothing
                 coordinates[*count][0] = -1;
                 coordinates[*count][1] = -1;
+                coordinates[*count][2] = -1;
+                continue;
+            } 
         success = IK(x, y, &theta1, &theta2);
 
         //Round up theta1 and theta2 and convert to integers
