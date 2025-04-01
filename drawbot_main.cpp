@@ -46,13 +46,8 @@ int main() // Main function
 {
   pause(1000);
   print("Program Started. Initializing...");
-  init_serial();
   
-  char updated_angles_str[MAX_CMD_LENGTH];
-  sprintf(updated_angles_str, "%d,%d", shoulder_angle, elbow_angle);
-  while(!get_state(NANO_READY)){}
   servo_arms_commands(shoulder_angle, elbow_angle);
-  while(!get_state(NANO_READY)){}
   servo_command(WRIST_PIN, WRIST_UP);
 
   char* selection;
@@ -73,7 +68,7 @@ int main() // Main function
                 
             //drawJoystickMap(lrV, udV);  // Display joystick movement as a map
             
-            if (get_state(NANO_READY) && (lrV < (2.5-JOYSTICK_DEADZONE) || udV < (2.5-JOYSTICK_DEADZONE) || lrV > (2.5+JOYSTICK_DEADZONE) || udV > (2.5+JOYSTICK_DEADZONE))){
+            if ((lrV < (2.5-JOYSTICK_DEADZONE) || udV < (2.5-JOYSTICK_DEADZONE) || lrV > (2.5+JOYSTICK_DEADZONE) || udV > (2.5+JOYSTICK_DEADZONE))){
                 update_joint_angles(lrV, udV);  // Update joint angles
                 print("lrV = %f, udV = %f\n", lrV, udV);
                 print("joint angles updated: (%d,%d)\n", shoulder_angle, elbow_angle);
@@ -94,7 +89,6 @@ int main() // Main function
         for(int i = 0; i < count; i++)
         {
         printf("command sent : %s\n", commands[i]);
-        while(!get_state(NANO_READY)){}
         all_servos(commands[i]);
         if (get_state(RESET_BTN)) break;
         pause(100);
@@ -103,7 +97,6 @@ int main() // Main function
     else printf("Invalid input. Please enter P or J.\n");
  }
 
-  close_serial();
 }
 
 void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][3], int* count) {
