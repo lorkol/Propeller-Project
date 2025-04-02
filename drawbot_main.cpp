@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "adcDCpropab.h"   // Include ADC library
 #include "fdserial.h" 
+#include <math.h>  // For fabs function
 
 #define MAX_COMMANDS 20
 #define MAX_CMD_LENGTH 128
@@ -10,8 +11,8 @@
 #define RESET_BTN 2
 
 #define M_PI 3.1415926535897932384626433
-#define LINK1_LENGTH 60
-#define LINK2_LENGTH 60
+#define LINK1_LENGTH 60.0
+#define LINK2_LENGTH 60.0
 #define SW 4
 #define JOYSTICK_DEADZONE 0.2
 
@@ -23,26 +24,26 @@
 
 //Servo constants
 #define SERVO_ITERATIONS 20 //iterations needed for the servos to be able to reach any angle
-#define WRIST_UP 50
-#define WRIST_DOWN 70
+#define WRIST_UP 50.0
+#define WRIST_DOWN 70.0
 #define CONSTRAIN(x, lower, upper) ((x < lower) ? lower : ((x > upper) ? upper : x))
-#define UPPER_SHOULDER_CONSTRAIN 180
-#define LOWER_SHOULDER_CONSTRAIN 0
-#define UPPER_ELBOW_CONSTRAIN 180
-#define LOWER_ELBOW_CONSTRAIN 0
+#define UPPER_SHOULDER_CONSTRAIN 180.0
+#define LOWER_SHOULDER_CONSTRAIN 0.0
+#define UPPER_ELBOW_CONSTRAIN 180.0
+#define LOWER_ELBOW_CONSTRAIN 0.0
 
-static volatile int shoulder_angle = 90;
-static volatile int elbow_angle = 90;
-static volatile int wrist_angle = WRIST_UP;
+static volatile float shoulder_angle = 90.0;
+static volatile float elbow_angle = 90.0;
+static volatile float wrist_angle = WRIST_UP;
 
-static volatile float cur_x = 0;
+static volatile float cur_x = 0.0;
 static volatile float cur_y = LINK1_LENGTH + LINK2_LENGTH;
 static volatile float target_x;
 static volatile float target_y;
 struct Command{
-    int shoulder_command;
-    int elbow_command;
-    int wrist_command;
+    float shoulder_command;
+    float elbow_command;
+    float wrist_command;
 };
 
 // Function prototypes
@@ -52,7 +53,7 @@ bool IK(float x, float y, float* theta1, float* theta2);
 void parseCoordinates(char* input, Command coordinates[MAX_COMMANDS], int* count);
 void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
-void servo_command(int pin, int angle);
+void servo_command(int pin, float angle);
 void all_servos(Command command);
 void init_servo_cogs();
 void close_cogs();
@@ -69,6 +70,11 @@ static volatile bool wrist_working = false;
 unsigned int shoulder_stack[40+25];
 unsigned int elbow_stack[40+25];
 unsigned int wrist_stack[40+25];
+
+// Add this helper function before all_servos
+bool equal_float(float a, float b) {
+    return fabs(a - b) < 0.1;  // Tolerance of 0.1 for one decimal place
+}
 
 int main() // Main function
 {
@@ -344,19 +350,19 @@ void update_joint_angles(float vx, float vy) {
 
     // X-axis controls X-position
     if(vx < 2.5-JOYSTICK_DEADZONE) {
-        if(vx < 0.2) target_x = cur_x - 5;  // Far left: decrement by 2
+        if(vx < 0.2) target_x = cur_x - 2;  // Far left: decrement by 2
         else target_x = cur_x - 1;          // Left: decrement by 1
     } else if(vx > 2.5+JOYSTICK_DEADZONE) {
-            if(vx > 4.7) target_x = cur_x + 5;  // Far right: increment by 2
+            if(vx > 4.7) target_x = cur_x + 2;  // Far right: increment by 2
         else target_x = cur_x + 1;          // Right: increment by 1
     }
 
     // Y-axis controls Y-position
     if(vy < 2.5-JOYSTICK_DEADZONE) {
-        if(vy < 0.2) target_y = cur_y - 5;     // Far down: decrement by 2
+        if(vy < 0.2) target_y = cur_y - 2;     // Far down: decrement by 2
         else target_y = cur_y - 1;             // Down: decrement by 1
     } else if(vy > 2.5+JOYSTICK_DEADZONE) {
-        if(vy > 4.7) target_y = cur_y + 5;     // Far up: increment by 2
+        if(vy > 4.7) target_y = cur_y + 2;     // Far up: increment by 2
         else target_y = cur_y + 1;             // Up: increment by 1
     }
 
@@ -380,16 +386,16 @@ void update_joint_angles(float vx, float vy) {
         if(target_elbow_angle > 180) target_elbow_angle = 180;
 
         // char updated_angles_str[MAX_CMD_LENGTH];
-        target_shoulder_angle = (int)target_shoulder_angle;
-        target_elbow_angle = (int)target_elbow_angle;
+        // target_shoulder_angle = (int)target_shoulder_angle;
+        // target_elbow_angle = (int)target_elbow_angle;
 
-        if (target_shoulder_angle == shoulder_angle && target_elbow_angle == elbow_angle) return;
-        else if (target_shoulder_angle == shoulder_angle && target_elbow_angle != elbow_angle)
+        if (equal_float(target_shoulder_angle, shoulder_angle) && equal_float(target_elbow_angle, elbow_angle)) return;
+        else if (equal_float(target_shoulder_angle, shoulder_angle) && !equal_float(target_elbow_angle, elbow_angle))
         {
             all_servos({-1, target_elbow_angle, -1});
             elbow_angle = target_elbow_angle;
         }
-        else if (target_shoulder_angle != shoulder_angle && target_elbow_angle == elbow_angle)
+        else if (!equal_float(target_shoulder_angle, shoulder_angle) && equal_float(target_elbow_angle, elbow_angle))
         {
             all_servos({target_shoulder_angle, -1, -1});
             shoulder_angle = target_shoulder_angle;
@@ -420,8 +426,12 @@ void close_cogs()
 
 void all_servos(Command command)
 {
-    if((command.shoulder_command == current_command.shoulder_command && command.elbow_command == current_command.elbow_command && command.wrist_command == current_command.wrist_command)
+    // Check if commands are the same (within tolerance) or if all commands are -1
+    if((equal_float(command.shoulder_command, current_command.shoulder_command) && 
+        equal_float(command.elbow_command, current_command.elbow_command) && 
+        equal_float(command.wrist_command, current_command.wrist_command))
      || (command.shoulder_command == -1 && command.elbow_command == -1 && command.wrist_command == -1)) return;
+    
     while(wrist_working || shoulder_working || elbow_working){};
     current_command.shoulder_command = command.shoulder_command;
     current_command.elbow_command = command.elbow_command;
@@ -429,7 +439,6 @@ void all_servos(Command command)
     if(command.shoulder_command != -1) shoulder_working = true;
     if(command.elbow_command != -1) elbow_working = true;
     if(command.wrist_command != -1) wrist_working = true;
-    
 }
 
 void shoulder_movement(void *par)
@@ -463,9 +472,11 @@ void wrist_movement(void *par)
 }
 
 
-void servo_command(int pin, int angle){
-  for (int i = 0; i < SERVO_ITERATIONS ; i++){
-    pulse_out(pin, (500+10*angle));
-    pause(20);
-    }
+void servo_command(int pin, float angle){
+    int pulse_width = (int)(500 + 10*angle);
+    print("pulse_width = %d\n", pulse_width);
+    for (int i = 0; i < SERVO_ITERATIONS ; i++){
+        pulse_out(pin, pulse_width);
+        pause(20);
+        }
 }
