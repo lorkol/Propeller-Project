@@ -34,15 +34,12 @@ static volatile int wrist_angle = 40;
 #define LOWER_ELBOW_CONSTRAIN 0
 
 // Function prototypes
-void send_string(char str_msg[MAX_CMD_LENGTH]);
 void itos(int num, char *str);
 void concat(char *dest, char *src);
 bool IK(float x, float y, float* theta1, float* theta2);
 void parseCoordinates(char* input, int coordinates[MAX_COMMANDS][3], int* count);
 void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
-void init_serial(void);
-void close_serial(void);
 void servo_command(int pin, int angle);
 void servo_arms_commands(int shoulder_angle, int elbow_angle);
 void all_servos(int commands[3]);
@@ -231,14 +228,11 @@ bool IK(float x, float y, float* theta1, float* theta2) {
 }
 
 void send_string(char str_msg[MAX_CMD_LENGTH]){
-    //init_serial();
     char ndx = -1;
     do {
         ndx++;
         fdserial_txChar(nano_serial, str_msg[ndx]);
     } while (str_msg[ndx] != 0);
-    //fdserial_txChar(nano_serial, '\n');
-    //close_serial();
 }
 
 void itos(int num, char *str) {
@@ -358,25 +352,15 @@ void update_joint_angles(float vx, float vy) {
         servo_arms_commands(new_shoulder_angle, -1);
     }
     else
-    {
       servo_arms_commands(new_shoulder_angle, new_elbow_angle);
-    }
 
     shoulder_angle = new_shoulder_angle;
     elbow_angle = new_elbow_angle;
 }
 
-void init_serial() {
-    if (nano_serial == NULL) {
-        nano_serial = fdserial_open(1, 0, 0, 9600);
     }
 }
 
-void close_serial() {
-    if (nano_serial != NULL) {
-        fdserial_close(nano_serial);
-        nano_serial = NULL;
-    }
 }
 
 
