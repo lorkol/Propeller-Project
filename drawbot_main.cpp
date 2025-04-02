@@ -15,23 +15,29 @@
 #define SW 4
 #define JOYSTICK_DEADZONE 0.2
 
-fdserial *nano_serial = NULL;
-static volatile int elbow_angle = 90;
-static volatile int shoulder_angle = 90;
-static volatile int wrist_angle = 40;
 
 //Servo Pins
 #define SHOULDER_PIN 15
 #define ELBOW_PIN 16
 #define WRIST_PIN 17
 #define SERVO_ITERATIONS 20 //iterations needed for the servos to be able to reach any angle
-#define WRIST_UP 40
-#define WRIST_DOWN 90
+#define WRIST_UP 50
+#define WRIST_DOWN 70
 #define CONSTRAIN(x, lower, upper) ((x < lower) ? lower : ((x > upper) ? upper : x))
 #define UPPER_SHOULDER_CONSTRAIN 180
 #define LOWER_SHOULDER_CONSTRAIN 0
 #define UPPER_ELBOW_CONSTRAIN 180
 #define LOWER_ELBOW_CONSTRAIN 0
+
+fdserial *nano_serial = NULL;
+static volatile int shoulder_angle = 90;
+static volatile int elbow_angle = 90;
+static volatile int wrist_angle = WRIST_UP;
+
+static volatile float cur_x = 0;
+static volatile float cur_y = LINK1_LENGTH + LINK2_LENGTH;
+static volatile float target_x;
+static volatile float target_y;
 
 // Function prototypes
 void send_string(char str_msg[MAX_CMD_LENGTH]);
@@ -72,19 +78,32 @@ int main() // Main function
             lrV = adc_volts(3);  // Read Left/Right voltage   
                 
             //drawJoystickMap(lrV, udV);  // Display joystick movement as a map
+            //char* test;
+            //itos(get_state(4),test);
+            //print("%s\n",test);
             
             if ((lrV < (2.5-JOYSTICK_DEADZONE) || udV < (2.5-JOYSTICK_DEADZONE) || lrV > (2.5+JOYSTICK_DEADZONE) || udV > (2.5+JOYSTICK_DEADZONE))){
                 update_joint_angles(lrV, udV);  // Update joint angles
-                print("lrV = %f, udV = %f\n", lrV, udV);
-                print("joint angles updated: (%d,%d)\n", shoulder_angle, elbow_angle);
-            } 
-
-            //pause(100);
+                //print("lrV = %f, udV = %f\n", lrV, udV);
+                print("joint angles updated: (%d,%d)\n\n", shoulder_angle, elbow_angle);
+            }
+            else if(get_state(4)){
+              if(wrist_angle==WRIST_DOWN){
+                 servo_command(WRIST_PIN, WRIST_UP);
+                 wrist_angle=WRIST_UP;
+              }
+              else if(wrist_angle==WRIST_UP){
+                 servo_command(WRIST_PIN, WRIST_DOWN);
+                 wrist_angle=WRIST_DOWN;
+              }
+            }               
+            pause(500);
+            
         }
     }
     else if(!strcmp(selection,"P"))
     {
-        char input_str[MAX_CMD_LENGTH] = "60,60 60,61 60,62 60,63 60,64 60,68 60,69 60,70 60,72 60,75 60,78 60,80";
+        char input_str[MAX_CMD_LENGTH] = "d 40,100 40,60 -40,60 -40,100 u";
         //char input_str[] = "u d u d u d";
         //char input_str[] = "u";
         int commands[MAX_COMMANDS][3];
@@ -158,6 +177,8 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], int coordinates[MAX_COMMANDS][
             coordinates[*count][0] = theta1_int;
             coordinates[*count][1] = theta2_int;
             coordinates[*count][2] = -1;
+            shoulder_angle = theta1_int;
+            elbow_angle = theta2_int;
             print("angles = %d,%d\n", theta1_int,theta2_int);
         }
         else// IK failed
@@ -179,9 +200,9 @@ bool IK(float x, float y, float* theta1, float* theta2) {
     float c2 = (x*x + y*y - LINK1_LENGTH*LINK1_LENGTH - LINK2_LENGTH*LINK2_LENGTH)/(2*LINK1_LENGTH*LINK2_LENGTH);
 
     // Print input coordinates first for debugging
-    print("IK for point: x=%f, y=%f\n", x, y);
+    //print("IK for point: x=%f, y=%f\n", x, y);
           
-    print("c2 = %d.%d\n", (int)c2, (int)(c2*100)%100);
+    //print("c2 = %d.%d\n", (int)c2, (int)(c2*100)%100);
 
     if(c2 >= -1 && c2 <= 1 && y >= 0)
     {
@@ -195,7 +216,7 @@ bool IK(float x, float y, float* theta1, float* theta2) {
         float gamma = atan2(y,x);
         
         // Convert to integer degrees multiplied by 100 for printing
-        print("alpha=%f, beta=%f, gamma=%f\n", alpha, beta, gamma);
+        //print("alpha=%f, beta=%f, gamma=%f\n", alpha, beta, gamma);
         
         if (x > 0)
         {
@@ -216,8 +237,6 @@ bool IK(float x, float y, float* theta1, float* theta2) {
         *theta1 = *theta1 * 180.0/M_PI;
         *theta2 = (*theta2 * 180.0/M_PI) + 90;
         print("theta1_deg=%f, theta2_deg=%f\n", *theta1, *theta2);
-        shoulder_angle = (int)*theta1;
-        elbow_angle = (int)*theta2;
         return true;
     } 
     else 
@@ -323,47 +342,79 @@ void update_joint_angles(float vx, float vy) {
     int xStep = (int)(vx);
     int yStep = (int)(vy);
 
-    // Ensure values stay within 0-4 range
-    if (xStep > 4) xStep = 4;
-    if (yStep > 4) yStep = 4;
+    // // Ensure values stay within 0-4 range
+    // if (xStep > 4) xStep = 4;
+    // if (yStep > 4) yStep = 4;
 
     // // Invert Y-axis so UP is at the top of the grid
     // yStep = 4 - yStep;
 
     // Update joint angles based on joystick position. If xStep/yStep is 2 then no change. 
     // If xStep/yStep is 1 decrement shoulder_angle/elbow_angle by 1 degree.
-    // If xStep/yStep is 0 decrement shoulder_angle/elbow_angle by 2 degrees.  
-
-    int new_shoulder_angle = shoulder_angle;
-    int new_elbow_angle = elbow_angle;
+    // If xStep/yStep is 0 decrement shoulder_angle/elbow_angle by 2 degrees.
     
-    
-    
-    // Constrain angles between 0 and 180 degrees
-    if(new_shoulder_angle < 0) new_shoulder_angle = 0;
-    if(new_shoulder_angle > 180) new_shoulder_angle = 180;
-    
-    if(new_elbow_angle < 0) new_elbow_angle = 0;
-    if(new_elbow_angle > 180) new_elbow_angle = 180;
-
-    char updated_angles_str[MAX_CMD_LENGTH];
-
-    if (new_shoulder_angle == shoulder_angle && new_elbow_angle == elbow_angle) return;
-    else if (new_shoulder_angle == shoulder_angle && new_elbow_angle != elbow_angle)
-    {
-        servo_arms_commands(-1, new_elbow_angle);
-    }
-    else if (new_shoulder_angle != shoulder_angle && new_elbow_angle == elbow_angle)
-    {
-        servo_arms_commands(new_shoulder_angle, -1);
-    }
-    else
-    {
-      servo_arms_commands(new_shoulder_angle, new_elbow_angle);
+    // X-axis controls X-position
+    if(vx < 2.5-JOYSTICK_DEADZONE) {
+        if(vx < 0.2) target_x = cur_x - 5;  // Far left: decrement by 2
+        else target_x = cur_x - 1;          // Left: decrement by 1
+    } else if(vx > 2.5+JOYSTICK_DEADZONE) {
+            if(vx > 4.7) target_x = cur_x + 5;  // Far right: increment by 2
+        else target_x = cur_x + 1;          // Right: increment by 1
     }
 
-    shoulder_angle = new_shoulder_angle;
-    elbow_angle = new_elbow_angle;
+    // Y-axis controls Y-position
+    if(vy < 2.5-JOYSTICK_DEADZONE) {
+        if(vy < 0.2) target_y = cur_y - 5;     // Far down: decrement by 2
+        else target_y = cur_y - 1;             // Down: decrement by 1
+    } else if(vy > 2.5+JOYSTICK_DEADZONE) {
+        if(vy > 4.7) target_y = cur_y + 5;     // Far up: increment by 2
+        else target_y = cur_y + 1;             // Up: increment by 1
+    }
+
+    float target_shoulder_angle;
+    float target_elbow_angle;
+
+    bool success = IK(target_x, target_y, &target_shoulder_angle, &target_elbow_angle);
+
+    if(!success){
+        print("Could not reach target point %f, %f - out of workspace\n", target_x, target_y);
+        return;
+    }
+    else{
+        cur_x = target_x;
+        cur_y = target_y;
+        // Constrain angles between 0 and 180 degrees
+        if(target_shoulder_angle < 0) target_shoulder_angle = 0;
+        if(target_shoulder_angle > 180) target_shoulder_angle = 180;
+        
+        if(target_elbow_angle < 0) target_elbow_angle = 0;
+        if(target_elbow_angle > 180) target_elbow_angle = 180;
+
+        // char updated_angles_str[MAX_CMD_LENGTH];
+        target_shoulder_angle = (int)target_shoulder_angle;
+        target_elbow_angle = (int)target_elbow_angle;
+
+        if (target_shoulder_angle == shoulder_angle && target_elbow_angle == elbow_angle) return;
+        else if (target_shoulder_angle == shoulder_angle && target_elbow_angle != elbow_angle)
+        {
+            servo_arms_commands(-1, target_elbow_angle);
+            elbow_angle = target_elbow_angle;
+        }
+        else if (target_shoulder_angle != shoulder_angle && target_elbow_angle == elbow_angle)
+        {
+            servo_arms_commands(target_shoulder_angle, -1);
+            shoulder_angle = target_shoulder_angle;
+        }
+        else
+        {
+        servo_arms_commands(target_shoulder_angle, target_elbow_angle);
+        shoulder_angle = target_shoulder_angle;
+        elbow_angle = target_elbow_angle;
+        }
+        print("Target point %f, %f reached with angles %f, %f\n", target_x, target_y, target_shoulder_angle, target_elbow_angle);
+    }
+
+    
 }
 
 void init_serial() {
@@ -397,6 +448,6 @@ void all_servos(int commands[3])
 {
     if(commands[0] == -1 && commands[1] == -1 && commands[2] == -1) return;
     servo_arms_commands(commands[0], commands[1]);
-    if(commands[2] != 0) servo_command(WRIST_PIN, commands[2]);
+    if(commands[2] != -1) servo_command(WRIST_PIN, commands[2]);
 }
-}
+
