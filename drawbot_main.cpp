@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "adcDCpropab.h"   // Include ADC library
 #include "fdserial.h" 
+#include <cmath>
 
 #define MAX_COMMANDS 20
 #define MAX_CMD_LENGTH 128
@@ -31,8 +32,8 @@
 #define UPPER_ELBOW_CONSTRAIN 180
 #define LOWER_ELBOW_CONSTRAIN 0
 
-static volatile int shoulder_angle = 90;
-static volatile int elbow_angle = 90;
+static volatile float shoulder_angle = 90.;
+static volatile float elbow_angle = 90.;
 static volatile int wrist_angle = WRIST_UP;
 
 static volatile float cur_x = 0;
@@ -40,9 +41,9 @@ static volatile float cur_y = LINK1_LENGTH + LINK2_LENGTH;
 static volatile float target_x;
 static volatile float target_y;
 struct Command{
-    int shoulder_command;
-    int elbow_command;
-    int wrist_command;
+    float shoulder_command;
+    float elbow_command;
+    float wrist_command;
 };
 
 // Function prototypes
@@ -52,7 +53,7 @@ bool IK(float x, float y, float* theta1, float* theta2);
 void parseCoordinates(char* input, Command coordinates[MAX_COMMANDS], int* count);
 void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
-void servo_command(int pin, int angle);
+void servo_command(int pin, float angle);
 void all_servos(Command command);
 void init_servo_cogs();
 void close_cogs();
@@ -62,7 +63,7 @@ void elbow_movement(void *par);
 void wrist_movement(void *par);
 
 static volatile unsigned int servos_working = 0;
-static volatile Command current_command = {-1, -1, -1};
+static volatile Command current_command = {-1., -1., -1.};
 static volatile bool shoulder_working = false;
 static volatile bool elbow_working = false;
 static volatile bool wrist_working = false;
@@ -101,15 +102,15 @@ int main() // Main function
             if ((lrV < (2.5-JOYSTICK_DEADZONE) || udV < (2.5-JOYSTICK_DEADZONE) || lrV > (2.5+JOYSTICK_DEADZONE) || udV > (2.5+JOYSTICK_DEADZONE))){
                 update_joint_angles(lrV, udV);  // Update joint angles
                 //print("lrV = %f, udV = %f\n", lrV, udV);
-                print("joint angles updated: (%d,%d)\n\n", shoulder_angle, elbow_angle);
+                print("joint angles updated: (%f,%f)\n\n", shoulder_angle, elbow_angle);
             }
             else if(get_state(4)){
               if(wrist_angle==WRIST_DOWN){
-                all_servos({-1, -1, WRIST_UP});
+                all_servos({-1., -1., WRIST_UP});
                  wrist_angle=WRIST_UP;
               }
               else if(wrist_angle==WRIST_UP){
-                all_servos({-1, -1, WRIST_DOWN});
+                all_servos({-1., -1., WRIST_DOWN});
                  wrist_angle=WRIST_DOWN;
               }
             }               
@@ -150,8 +151,8 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
 
     while(token != NULL && *count < MAX_COMMANDS) {
         printf("token = %s\n",token);
-        if(token[0] == 'u') coordinates[*count] = {-1, -1, WRIST_UP};
-        else if(token[0] == 'd') coordinates[*count] = {-1, -1, WRIST_DOWN};
+        if(token[0] == 'u') coordinates[*count] = {-1., -1., WRIST_UP};
+        else if(token[0] == 'd') coordinates[*count] = {-1., -1., WRIST_DOWN};
         else 
         {
             // Split the token at the comma to get x and y coordinates
@@ -165,7 +166,7 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
                 *comma_pos = ',';
             } 
             else {// Invalid format - do nothing
-                coordinates[*count] = {-1, -1, -1};
+                coordinates[*count] = {-1., -1., -1.};
                 continue;
             } 
         success = IK(x, y, &theta1, &theta2);
@@ -177,16 +178,16 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
         if(success)
         {
           // Convert to integers
-            int theta1_int = (int)theta1;
-            int theta2_int = (int)theta2;  
+            float theta1_int = std::round(theta1*10.) / 10.;  
+            float theta2_int = std::round(theta2*10.) / 10.;  
 
             shoulder_angle = theta1_int;
             elbow_angle = theta2_int;
-            coordinates[*count] = {theta1_int, theta2_int, -1};
-            print("angles = %d,%d\n", theta1_int,theta2_int);
+            coordinates[*count] = {theta1_int, theta2_int, -1.};
+            print("angles = %f,%f\n", theta1_int,theta2_int);
         }
         else// IK failed
-            coordinates[*count] = {-1, -1, -1};
+            coordinates[*count] = {-1., -1., -1.};
       }
 
       (*count)++;
@@ -372,31 +373,30 @@ void update_joint_angles(float vx, float vy) {
     else{
         cur_x = target_x;
         cur_y = target_y;
+        target_shoulder_angle = std::round(target_shoulder_angle*10.) / 10.;
+        target_elbow_angle = std::round(target_elbow_angle*10.) / 10.;
         // Constrain angles between 0 and 180 degrees
-        if(target_shoulder_angle < 0) target_shoulder_angle = 0;
-        if(target_shoulder_angle > 180) target_shoulder_angle = 180;
+        if(target_shoulder_angle < 0) target_shoulder_angle = 0.;
+        if(target_shoulder_angle > 180) target_shoulder_angle = 180.;
         
-        if(target_elbow_angle < 0) target_elbow_angle = 0;
-        if(target_elbow_angle > 180) target_elbow_angle = 180;
+        if(target_elbow_angle < 0) target_elbow_angle = 0.;
+        if(target_elbow_angle > 180) target_elbow_angle = 180.;
 
-        // char updated_angles_str[MAX_CMD_LENGTH];
-        target_shoulder_angle = (int)target_shoulder_angle;
-        target_elbow_angle = (int)target_elbow_angle;
 
         if (target_shoulder_angle == shoulder_angle && target_elbow_angle == elbow_angle) return;
         else if (target_shoulder_angle == shoulder_angle && target_elbow_angle != elbow_angle)
         {
-            all_servos({-1, target_elbow_angle, -1});
+            all_servos({-1., target_elbow_angle, -1.});
             elbow_angle = target_elbow_angle;
         }
         else if (target_shoulder_angle != shoulder_angle && target_elbow_angle == elbow_angle)
         {
-            all_servos({target_shoulder_angle, -1, -1});
+            all_servos({target_shoulder_angle, -1., -1.});
             shoulder_angle = target_shoulder_angle;
         }
         else
         {
-        all_servos({target_shoulder_angle, target_elbow_angle, -1});
+        all_servos({target_shoulder_angle, target_elbow_angle, -1.});
         shoulder_angle = target_shoulder_angle;
         elbow_angle = target_elbow_angle;
         }
@@ -421,15 +421,14 @@ void close_cogs()
 void all_servos(Command command)
 {
     if((command.shoulder_command == current_command.shoulder_command && command.elbow_command == current_command.elbow_command && command.wrist_command == current_command.wrist_command)
-     || (command.shoulder_command == -1 && command.elbow_command == -1 && command.wrist_command == -1)) return;
+     || (command.shoulder_command == -1. && command.elbow_command == -1. && command.wrist_command == -1.)) return;
     while(wrist_working || shoulder_working || elbow_working){};
     current_command.shoulder_command = command.shoulder_command;
     current_command.elbow_command = command.elbow_command;
     current_command.wrist_command = command.wrist_command;
-    if(command.shoulder_command != -1) shoulder_working = true;
-    if(command.elbow_command != -1) elbow_working = true;
-    if(command.wrist_command != -1) wrist_working = true;
-    
+    if(command.shoulder_command != -1.) shoulder_working = true;
+    if(command.elbow_command != -1.) elbow_working = true;
+    if(command.wrist_command != -1.) wrist_working = true;   
 }
 
 void shoulder_movement(void *par)
@@ -463,9 +462,9 @@ void wrist_movement(void *par)
 }
 
 
-void servo_command(int pin, int angle){
+void servo_command(int pin, float angle){
   for (int i = 0; i < SERVO_ITERATIONS ; i++){
-    pulse_out(pin, (500+10*angle));
+    pulse_out(pin, (500+(int)10*angle));
     pause(20);
     }
 }
