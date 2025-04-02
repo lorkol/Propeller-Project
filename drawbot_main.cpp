@@ -408,9 +408,12 @@ void elbow_movement(void *par)
 
 void wrist_movement(void *par)
 {
-    while(!wrist_working) pause(20);
-    servo_command(WRIST_PIN, current_command.wrist_command);
-    wrist_working = false;
+    while(1)
+    {
+        while(!wrist_working) pause(20);
+        servo_command(WRIST_PIN, current_command.wrist_command);
+        wrist_working = false;
+    }
 }
 
 
