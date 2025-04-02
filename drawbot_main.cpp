@@ -397,5 +397,6 @@ void all_servos(int commands[3])
 {
     if(commands[0] == -1 && commands[1] == -1 && commands[2] == -1) return;
     servo_arms_commands(commands[0], commands[1]);
-    servo_command(WRIST_PIN, commands[2]);
+    if(commands[2] != 0) servo_command(WRIST_PIN, commands[2]);
+}
 }
