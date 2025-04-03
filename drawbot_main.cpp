@@ -5,8 +5,8 @@
 #include "fdserial.h" 
 #include <cmath>
 
-#define MAX_COMMANDS 20
-#define MAX_CMD_LENGTH 128
+#define MAX_COMMANDS 50
+#define MAX_CMD_LENGTH 300
 #define NANO_READY 1
 #define RESET_BTN 2
 
@@ -145,7 +145,7 @@ int main() // Main function
     }
     else if(!strcmp(selection,"P"))
     {
-        char input_str[MAX_CMD_LENGTH] = "-83,78 d -83,78 -42,102 -81,61 -83,78 u";
+        char input_str[MAX_CMD_LENGTH] = "-100,50 d -100,50 -93,73 u -96,63 d -96,63 -72,62 u -76,51 d -76,51 -68,77 u -63,98 d -63,98 -33,82 -31,113 -43,100 -63,98 u 7,85 d 7,85 12,116 29,83 36,112 u 56,105 d 56,105 59,90 52,68 59,90 74,93 u 90,77 d 90,77 73,60 90,43 103,56 u 73,30";
         Command commands[MAX_COMMANDS];
         int count = 0;
         Point prev_location;
@@ -160,6 +160,7 @@ int main() // Main function
                 print("current location = %f,%f\n", path[i].x, path[i].y);
                 if (path[i-1].pen_up) pen_down = false;
                 if (path[i-1].pen_down) pen_down = true;
+
                 if(pen_down && !path[i].pen_up && path[i].legitimate_point)
                 {
                     prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
