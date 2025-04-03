@@ -154,12 +154,13 @@ int main() // Main function
         int steps = 0; //Num of steps for filler path
         for(int i = 0; i < count; i++)
         {
-            printf("command sent : %d, %d, %d\n", commands[i].shoulder_command, commands[i].elbow_command, commands[i].wrist_command);
-            if(i!=0)
+            print("command sent : %f, %f, %f\n", commands[i].shoulder_command, commands[i].elbow_command, commands[i].wrist_command);
+            if(i>1)
             {
                 if(pen_down && !path[i].pen_up && path[i].legitimate_point)
                 {
                     prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
+                    print("prev location = %f, %f\n", prev_location.x, prev_location.y);
                     steps = path_filler(prev_location, path[i]);
                     for(int j = 0; j < steps; j++) 
                     {
@@ -343,14 +344,14 @@ int path_filler(Point p1, Point p2)
     float dy = p2.y - p1.y;
     float shoulder_ang;
     float elbow_ang;
-    int steps = ((int) (dx<dy ? dx : dy)) + 1;
+    int steps = ((int) (fabs(dx)<fabs(dy) ? fabs(dy) : fabs(dx))) + 1;
     float x_step_size = dx/steps;
     float y_step_size = dy/steps;
     bool success;
     for(int i = 0; i < steps ; i++)
     {
         success = IK(p1.x + i*x_step_size, p1.y + i*y_step_size, &shoulder_ang, &elbow_ang);
-        if(success) filler_path[i] = {p1.x + i*x_step_size, p1.y + i*y_step_size, -1.};
+        if(success) filler_path[i] = {shoulder_ang, elbow_ang, -1.};
         else filler_path[i] = {-1., -1., -1.};
     }
     return steps;
