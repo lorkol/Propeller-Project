@@ -63,7 +63,6 @@ void shoulder_movement(void *par);
 void elbow_movement(void *par);
 void wrist_movement(void *par);
 
-static volatile unsigned int servos_working = 0;
 static volatile Command current_command = {-1., -1., -1.};
 static volatile bool shoulder_working = false;
 static volatile bool elbow_working = false;
@@ -71,6 +70,20 @@ static volatile bool wrist_working = false;
 unsigned int shoulder_stack[40+25];
 unsigned int elbow_stack[40+25];
 unsigned int wrist_stack[40+25];
+
+//Variables for filler process
+static volatile bool pen_down = false;
+const int MAX_FILLER_COMMANDS = 2*(LINK1_LENGTH+LINK2_LENGTH);
+struct Point{
+    bool pen_up;
+    bool pen_down;
+    float x;
+    float y;
+    bool legitimate_point;
+};
+Point path[MAX_COMMANDS];
+Command filler_path[MAX_FILLER_COMMANDS];
+int path_filler(Point p1, Point p2);
 
 // Add this helper function before all_servos
 bool equal_float(float a, float b) {
@@ -131,11 +144,26 @@ int main() // Main function
         //char input_str[] = "u";
         Command commands[MAX_COMMANDS];
         int count = 0;
+        Point prev_location;
         parseCoordinates(input_str, commands, &count);
         printf("num commands = %d\n", count);
+        int steps = 0; //Num of steps for filler path
         for(int i = 0; i < count; i++)
         {
             printf("command sent : %d, %d, %d\n", commands[i].shoulder_command, commands[i].elbow_command, commands[i].wrist_command);
+            if(i!=0)
+            {
+                if(pen_down && !path[i].pen_up && path[i].legitimate_point)
+                {
+                    prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
+                    steps = path_filler(prev_location, path[i]);
+                    for(int j = 0; j < steps; j++) 
+                    {
+                        all_servos(filler_path[j]);
+                        pause(2);
+                    }
+                }
+            }
             all_servos(commands[i]);
             if (get_state(RESET_BTN)) break;
             pause(100);
@@ -157,8 +185,16 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
 
     while(token != NULL && *count < MAX_COMMANDS) {
         printf("token = %s\n",token);
-        if(token[0] == 'u') coordinates[*count] = {-1., -1., WRIST_UP};
-        else if(token[0] == 'd') coordinates[*count] = {-1., -1., WRIST_DOWN};
+        if(token[0] == 'u') 
+        {
+            coordinates[*count] = {-1., -1., WRIST_UP};
+            path[*count] = {true, false, -666., -666., true};
+        }
+        else if(token[0] == 'd')
+        {
+            coordinates[*count] = {-1., -1., WRIST_DOWN};
+            path[*count] = {false, true, -666., -666., true};
+        }
         else 
         {
             // Split the token at the comma to get x and y coordinates
@@ -168,11 +204,13 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
                 *comma_pos = '\0';
                 x = atof(token);
                 y = atof(comma_pos + 1);
+                path[*count] = {false, false, x, y, true};
                 // Restore the comma
                 *comma_pos = ',';
             } 
             else {// Invalid format - do nothing
                 coordinates[*count] = {-1., -1., -1.};
+                path[*count] = {false, false, -666., -666., false};
                 continue;
             } 
         success = workspace_check(x, y);
@@ -202,8 +240,6 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
       token = strtok(NULL, " ");  // Get the next token
     }
 }
-
-
 
 bool IK(float x, float y, float* theta1, float* theta2) {
     float c2 = (x*x + y*y - LINK1_LENGTH*LINK1_LENGTH - LINK2_LENGTH*LINK2_LENGTH)/(2*LINK1_LENGTH*LINK2_LENGTH);
@@ -261,6 +297,26 @@ bool IK(float x, float y, float* theta1, float* theta2) {
 bool workspace_check(float x, float y)
 {
     return (LINK1_LENGTH - (LINK2_LENGTH - LINK1_LENGTH) <= sqrt(pow(x, 2) + pow(y, 2)) < LINK1_LENGTH + LINK2_LENGTH);
+}
+
+int path_filler(Point p1, Point p2)
+{
+    for(int k = 0; k < MAX_FILLER_COMMANDS; k++) filler_path[k] = {-1., -1., -1.};
+    float dx = p2.x - p1.x;
+    float dy = p2.y - p1.y;
+    float shoulder_ang;
+    float elbow_ang;
+    int steps = ((int) (dx<dy ? dx : dy)) + 1;
+    float x_step_size = dx/steps;
+    float y_step_size = dy/steps;
+    bool success;
+    for(int i = 0; i < steps ; i++)
+    {
+        success = IK(p1.x + i*x_step_size, p1.y + i*y_step_size, &shoulder_ang, &elbow_ang);
+        if(success) filler_path[i] = {p1.x + i*x_step_size, p1.y + i*y_step_size, -1.};
+        else filler_path[i] = {-1., -1., -1.};
+    }
+    return steps;
 }
 
 void itos(int num, char *str) {
@@ -470,6 +526,8 @@ void wrist_movement(void *par)
     {
         while(!wrist_working) pause(20);
         servo_command(WRIST_PIN, current_command.wrist_command);
+        if(current_command.wrist_command == WRIST_DOWN) pen_down = true;
+        if(current_command.wrist_command == WRIST_UP) pen_down = false;
         wrist_working = false;
     }
 }
