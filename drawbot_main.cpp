@@ -50,6 +50,7 @@ struct Command{
 void itos(int num, char *str);
 void concat(char *dest, char *src);
 bool IK(float x, float y, float* theta1, float* theta2);
+bool workspace_check(float x, float y);
 void parseCoordinates(char* input, Command coordinates[MAX_COMMANDS], int* count);
 void drawJoystickMap(float jx, float jy);
 void update_joint_angles(float jx, float jy);
@@ -174,7 +175,9 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
                 coordinates[*count] = {-1., -1., -1.};
                 continue;
             } 
-        success = IK(x, y, &theta1, &theta2);
+        success = workspace_check(x, y);
+        if (success) success = IK(x, y, &theta1, &theta2);
+        else print("Can not reach position %f,%f - it is outside of the workspace", x, y);
 
         //Round up theta1 and theta2 and convert to integers
         // theta1 = round(theta1);
@@ -253,6 +256,11 @@ bool IK(float x, float y, float* theta1, float* theta2) {
         *theta2 = 0;
         return false;
     }
+}
+
+bool workspace_check(float x, float y)
+{
+    return (LINK1_LENGTH - (LINK2_LENGTH - LINK1_LENGTH) <= sqrt(pow(x, 2) + pow(y, 2)) < LINK1_LENGTH + LINK2_LENGTH);
 }
 
 void itos(int num, char *str) {
