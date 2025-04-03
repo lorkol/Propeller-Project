@@ -145,7 +145,7 @@ int main() // Main function
     }
     else if(!strcmp(selection,"P"))
     {
-        char input_str[MAX_CMD_LENGTH] = "d 40,100 40,60 -40,60 -40,100 u";
+        char input_str[MAX_CMD_LENGTH] = "-83,78 d -83,78 -42,102 -81,61 -83,78 u";
         Command commands[MAX_COMMANDS];
         int count = 0;
         Point prev_location;
@@ -157,6 +157,7 @@ int main() // Main function
             print("command sent : %f, %f, %f\n", commands[i].shoulder_command, commands[i].elbow_command, commands[i].wrist_command);
             if(i>1)
             {
+                print("current location = %f,%f\n", path[i].x, path[i].y);
                 if(pen_down && !path[i].pen_up && path[i].legitimate_point)
                 {
                     prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
@@ -347,6 +348,8 @@ int path_filler(Point p1, Point p2)
     int steps = ((int) (fabs(dx)<fabs(dy) ? fabs(dy) : fabs(dx))) + 1;
     float x_step_size = dx/steps;
     float y_step_size = dy/steps;
+    print("steps = %d\n", steps);
+    print("x_step_size = %f, y_step_size = %f\n", x_step_size, y_step_size);
     bool success;
     for(int i = 0; i < steps ; i++)
     {
