@@ -158,6 +158,8 @@ int main() // Main function
             if(i>1)
             {
                 print("current location = %f,%f\n", path[i].x, path[i].y);
+                if (path[i-1].pen_up) pen_down = false;
+                if (path[i-1].pen_down) pen_down = true;
                 if(pen_down && !path[i].pen_up && path[i].legitimate_point)
                 {
                     prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
@@ -565,8 +567,8 @@ void wrist_movement(void *par)
     {
         while(!wrist_working) pause(20);
         servo_command(WRIST_PIN, current_command.wrist_command);
-        if(current_command.wrist_command == WRIST_DOWN) pen_down = true;
-        if(current_command.wrist_command == WRIST_UP) pen_down = false;
+        if(equal_float(current_command.wrist_command,WRIST_DOWN)) pen_down = true;
+        if(equal_float(current_command.wrist_command,WRIST_UP)) pen_down = false;
         wrist_working = false;
     }
 }
