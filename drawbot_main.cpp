@@ -7,7 +7,6 @@
 
 #define MAX_COMMANDS 50
 #define MAX_CMD_LENGTH 300
-#define NANO_READY 1
 #define RESET_BTN 2
 
 #define M_PI 3.1415926535897932384626433
@@ -24,6 +23,8 @@
 
 //Servo constants
 #define SERVO_ITERATIONS 20 //iterations needed for the servos to be able to reach any angle
+#define SMALL_SERVO_MOVEMENT_ITERATIONS 2
+static volatile servo_iterations = SERVO_ITERATIONS;
 #define WRIST_UP 50.0
 #define WRIST_DOWN 70.0
 #define CONSTRAIN(x, lower, upper) ((x < lower) ? lower : ((x > upper) ? upper : x))
@@ -166,16 +167,14 @@ int main() // Main function
                     prev_location = path[i-1].pen_down ? path[i-2] : path[i-1];
                     print("prev location = %f, %f\n", prev_location.x, prev_location.y);
                     steps = path_filler(prev_location, path[i]);
-                    for(int j = 0; j < steps; j++) 
-                    {
-                        all_servos(filler_path[j]);
-                        pause(2);
-                    }
+                    servo_iterations = SMALL_SERVO_MOVEMENT_ITERATIONS;
+                    for(int j = 0; j < steps; j++) all_servos(filler_path[j]);
                 }
             }
+            servo_iterations = SERVO_ITERATIONS;
             all_servos(commands[i]);
             if (get_state(RESET_BTN)) break;
-            pause(100);
+            pause(10);
         }
     }
     else if(!strcmp(selection,"W"))
@@ -577,7 +576,7 @@ void wrist_movement(void *par)
 
 void servo_command(int pin, float angle){
     int pulse_width = (int)(500 + 10*angle);
-    for (int i = 0; i < SERVO_ITERATIONS ; i++){
+    for (int i = 0; i < servo_iterations ; i++){
         pulse_out(pin, pulse_width);
         pause(20);
         }
