@@ -32,12 +32,12 @@
 #define UPPER_ELBOW_CONSTRAIN 180.0
 #define LOWER_ELBOW_CONSTRAIN 0.0
 
-static volatile float shoulder_angle = 90.;
-static volatile float elbow_angle = 90.;
+static volatile float shoulder_angle = 132.0;
+static volatile float elbow_angle = 142.3;
 static volatile int wrist_angle = WRIST_UP;
 
-static volatile float cur_x = 0.0;
-static volatile float cur_y = LINK1_LENGTH + LINK2_LENGTH;
+static volatile float cur_x = -100.0;
+static volatile float cur_y = 40.0;
 static volatile float target_x;
 static volatile float target_y;
 struct Command{
@@ -87,7 +87,10 @@ int main() // Main function
   char* selection;
   while(1)
   {
-    printf("Please choose whether you want to use the pre-programmed drawing - P or use the joystick manually - J: ");
+    printf("Please choose program to use:\n");
+    printf("- Pre-programmed drawing (P)\n");
+    printf("- Joystick Control (J)\n");
+    printf("- Draw Workspace (W)\n");
     scanf("%s", selection);
     if (!strcmp(selection,"J"))
     {
@@ -97,6 +100,8 @@ int main() // Main function
         
         
         while (!get_state(RESET_BTN)) {
+            
+            
             udV = adc_volts(2);  // Read Up/Down voltage
             lrV = adc_volts(3);  // Read Left/Right voltage   
                 
@@ -119,16 +124,15 @@ int main() // Main function
                 all_servos({-1., -1., WRIST_DOWN});
                  wrist_angle=WRIST_DOWN;
               }
+              pause(500);
             }               
-            pause(500);
+            pause(100);
             
         }
     }
     else if(!strcmp(selection,"P"))
     {
         char input_str[MAX_CMD_LENGTH] = "d 40,100 40,60 -40,60 -40,100 u";
-        //char input_str[] = "u d u d u d";
-        //char input_str[] = "u";
         Command commands[MAX_COMMANDS];
         int count = 0;
         parseCoordinates(input_str, commands, &count);
@@ -140,6 +144,41 @@ int main() // Main function
             if (get_state(RESET_BTN)) break;
             pause(100);
         }
+    }
+    else if(!strcmp(selection,"W"))
+    {
+        print("Drawing workspace...\n");
+        all_servos({25., 90., -1.});
+        all_servos({-1., -1., 80.});
+        for(float i = 25.; i < 50.; i++)
+        {
+            all_servos({i, -1., -1.});
+            //pause(100);
+        }
+        all_servos({-1., -1., WRIST_DOWN});
+        for(float i = 50.; i < 160.; i++)
+        {
+            all_servos({i, -1., -1.});
+            //pause(100);
+        }
+        all_servos({-1., -1., WRIST_UP});
+        all_servos({130., 180., -1.});
+        all_servos({-1., -1., WRIST_DOWN});
+        for(int i = 130; i >= 50; i--)
+        {
+            all_servos({i, -1., -1.});
+            //pause(100);
+        }
+        all_servos({-1., -1., WRIST_UP});
+        all_servos({140., 0., -1.});
+        all_servos({-1., -1., WRIST_DOWN});
+        for(int i = 140; i >= 50; i--)
+        {
+            all_servos({i, -1., -1.});
+            //pause(100);
+        }
+        all_servos({-1., -1., WRIST_UP});
+        print("Workspace drawn\n");
     }
     else printf("Invalid input. Please enter P or J.\n");
  }
@@ -186,13 +225,11 @@ void parseCoordinates(char input[MAX_CMD_LENGTH], Command coordinates[MAX_COMMAN
         if(success)
         {
           // Convert to integers
-            float theta1_int = std::round(theta1*10.) / 10.;  
-            float theta2_int = std::round(theta2*10.) / 10.;  
 
-            shoulder_angle = theta1_int;
-            elbow_angle = theta2_int;
-            coordinates[*count] = {theta1_int, theta2_int, -1.};
-            print("angles = %f,%f\n", theta1_int,theta2_int);
+            shoulder_angle = theta1;
+            elbow_angle = theta2;
+            coordinates[*count] = {theta1, theta2, -1.};
+            print("angles = %f,%f\n", theta1,theta2);
         }
         else// IK failed
             coordinates[*count] = {-1., -1., -1.};
@@ -386,8 +423,6 @@ void update_joint_angles(float vx, float vy) {
     else{
         cur_x = target_x;
         cur_y = target_y;
-        target_shoulder_angle = std::round(target_shoulder_angle*10.) / 10.;
-        target_elbow_angle = std::round(target_elbow_angle*10.) / 10.;
         // Constrain angles between 0 and 180 degrees
         if(target_shoulder_angle < 0) target_shoulder_angle = 0.;
         if(target_shoulder_angle > 180) target_shoulder_angle = 180.;
@@ -476,8 +511,9 @@ void wrist_movement(void *par)
 
 
 void servo_command(int pin, float angle){
-  for (int i = 0; i < SERVO_ITERATIONS ; i++){
-    pulse_out(pin, (500+(int)10*angle));
-    pause(20);
-    }
+    int pulse_width = (int)(500 + 10*angle);
+    for (int i = 0; i < SERVO_ITERATIONS ; i++){
+        pulse_out(pin, pulse_width);
+        pause(20);
+        }
 }
